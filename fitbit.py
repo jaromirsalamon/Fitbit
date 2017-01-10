@@ -13,10 +13,11 @@ if __name__ == '__main__':
 
     c = Credentials('config.ini')  # start
     date1 = datetime.date(2016, 5, 10)
-    # date2 = datetime.date(2016, 6, 12)
-    date2 = datetime.date.today() - datetime.timedelta(days = 1)
+    date2 = datetime.date(2016, 6, 30)
+    #date2 = datetime.date.today() - datetime.timedelta(days = 1)
 
-    TEMPLATE = """{date}\t{time}\t{heart_rate}\n"""
+    TEMPLATE_TSV = """{date}\t{time}\t{heart_rate}\n"""
+    TEMPLATE_CSV = """{date},{time},{heart_rate}\n"""
 
     if c.hasCredentials():  # credentials
         if not c.hasAuthorization():  # no token
@@ -27,6 +28,10 @@ if __name__ == '__main__':
             c.setAutorization(server.oauth.token['access_token'], server.oauth.token['refresh_token'],
                               server.oauth.token['expires_at'])
 
+        out_file_name = 'output/heart-rate-' + str(datetime.date.today()) + '.csv'
+        print('Writing heart rate to file: ' + out_file_name)
+        f = io.open(out_file_name, 'wb')
+
         for d in daterange(date1, date2):
             if c.hasTime() > 0:
                 print 'authorization active... still have enough time'
@@ -35,27 +40,28 @@ if __name__ == '__main__':
                                    refresh_token=c.getRefreshToken())
                 # print fb.user_profile_get()['user']['fullName']
 
-                out_file_name = 'output/heart-rate-' + str(d) + '.csv'
-                print('Writing heart rate to file: ' + out_file_name)
-                f = io.open(out_file_name, 'wb')
-
                 json = fb.intraday_time_series(resource='activities/heart', base_date=str(d), detail_level='1sec')
                 hr_list = json['activities-heart-intraday']['dataset']
                 for hr in hr_list:
                     # print json['activities-heart'][0]['dateTime'] + " " + hr['time'] + ": " + str(hr['value'])
-                    f.write(TEMPLATE.format(
+                    f.write(TEMPLATE_CSV.format(
                         date = json['activities-heart'][0]['dateTime'],
                         time = hr['time'],
                         heart_rate = hr['value']
                     ))
 
-                f.close()
+                print('extracted data from: ' + str(d))
+
             elif 0 < c.hasTime() < 300:  # 5 minutes before expiration
                 print 'authorization active... but less than 5 minutes'
                 # TODO do the refresh
 
             else:
                 print 'authorization expired... run again for authorization'
+                f.close()
                 c.setAutorization('', '', 0)
+
+        f.close()
+
     else:  # no credentials
         print 'fail, fill configuration'
